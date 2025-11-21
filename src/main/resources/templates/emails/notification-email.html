@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${subject}">Notification</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 0; background-color: #f4f4f4; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .header { background-color: #6c757d; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+        .content { padding: 20px; }
+        .footer { background-color: #f8f8f8; padding: 15px; text-align: center; border-radius: 0 0 5px 5px; font-size: 12px; color: #666; }
+        .message-box { background-color: #f8f9fa; padding: 15px; border-radius: 4px; border-left: 4px solid #6c757d; margin: 15px 0; }
+        .btn { display: inline-block; padding: 12px 25px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 5px; margin: 10px 0; }
+        .btn:hover { background-color: #545b62; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 th:text="${subject}">Notification</h1>
+        </div>
+        <div class="content">
+            <h2>Hello <span th:text="${firstName}">User</span>,</h2>
+            
+            <div class="message-box">
+                <p th:utext="${#strings.replace(message, #strings.escapeXml(T(System).lineSeparator()), '<br/>')}">Message content</p>
+            </div>
+            
+            <p>This is an automated notification from <span th:text="${appName}">SecureSystem</span>.</p>
+            
+            <a th:href="${appUrl}" class="btn">Visit Application</a>
+            
+            <p>If you have any questions, please contact our support team.</p>
+        </div>
+        <div class="footer">
+            <p>© <span th:text="${year}">2024</span> <span th:text="${appName}">SecureSystem</span>. All rights reserved.</p>
+            <p>This is an automated notification email.</p>
+        </div>
+    </div>
+</body>
+</html>

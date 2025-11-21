@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Status Update</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; margin: 0; padding: 0; background-color: #f4f4f4; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; padding: 20px; border-radius: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        .header { color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0; }
+        .header.active { background-color: #28a745; }
+        .header.inactive { background-color: #dc3545; }
+        .header.suspended { background-color: #ffc107; color: #212529; }
+        .content { padding: 20px; }
+        .footer { background-color: #f8f8f8; padding: 15px; text-align: center; border-radius: 0 0 5px 5px; font-size: 12px; color: #666; }
+        .status-box { padding: 15px; border-radius: 4px; margin: 15px 0; border-left: 4px solid; }
+        .status-active { background-color: #e8f5e8; border-color: #28a745; }
+        .status-inactive { background-color: #f8e8e8; border-color: #dc3545; }
+        .status-suspended { background-color: #fff3cd; border-color: #ffc107; }
+        .contact-info { background-color: #e9ecef; padding: 15px; border-radius: 4px; margin: 15px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header" th:classappend="${status == 'ACTIVE'} ? 'active' : (${status == 'SUSPENDED'} ? 'suspended' : 'inactive')">
+            <h1>Account Status Update</h1>
+        </div>
+        <div class="content">
+            <h2>Hello <span th:text="${firstName}">User</span>,</h2>
+            <p>Your account status has been updated.</p>
+            
+            <div class="status-box" th:classappend="${status == 'ACTIVE'} ? 'status-active' : (${status == 'SUSPENDED'} ? 'status-suspended' : 'status-inactive')">
+                <h3>New Status: <span th:text="${status}">Status</span></h3>
+                <p><strong>Reason:</strong> <span th:text="${reason}">Reason</span></p>
+            </div>
+            
+            <div th:if="${status == 'ACTIVE'}">
+                <p><strong>Your account is now active!</strong></p>
+                <ul>
+                    <li>You can now log in to your account</li>
+                    <li>All features are available to you</li>
+                    <li>You can access all your data and services</li>
+                </ul>
+            </div>
+            
+            <div th:if="${status == 'SUSPENDED'}">
+                <p><strong>Your account has been temporarily suspended.</strong></p>
+                <ul>
+                    <li>You cannot log in during the suspension period</li>
+                    <li>Your data remains safe and intact</li>
+                    <li>Contact support for more information</li>
+                </ul>
+            </div>
+            
+            <div th:if="${status == 'INACTIVE'}">
+                <p><strong>Your account has been deactivated.</strong></p>
+                <ul>
+                    <li>You cannot access your account</li>
+                    <li>Contact support if you believe this is an error</li>
+                    <li>Your data will be preserved according to our data policy</li>
+                </ul>
+            </div>
+            
+            <div class="contact-info">
+                <h3>Need Help?</h3>
+                <p>If you have questions about this status change or need assistance, please contact our support team.</p>
+                <p>We're here to help you resolve any issues.</p>
+            </div>
+        </div>
+        <div class="footer">
+            <p>© <span th:text="${year}">2024</span> <span th:text="${appName}">SecureSystem</span>. All rights reserved.</p>
+            <p>This email was sent to notify you of an account status change.</p>
+        </div>
+    </div>
+</body>
+</html>
