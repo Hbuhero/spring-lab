@@ -27,7 +27,6 @@ public class UserRequest {
     private String role;
     
     private String permissions;
-    
-    @NotBlank
+
     private String status;
 }

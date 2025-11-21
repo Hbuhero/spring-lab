@@ -53,7 +53,10 @@ public class AppSecurityConfig {
                         .requestMatchers("/api/v1/livestock/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                .formLogin(Customizer.withDefaults())
+                .formLogin(form -> form
+                                .loginProcessingUrl("/api/v1/auth/login")
+                                .isCustomLoginPage()
+                        )
                 .oauth2Login(oauth2 -> oauth2
                         .successHandler(customOAuth2AuthorizationSuccessHandler)
                         .redirectionEndpoint(Customizer.withDefaults())
