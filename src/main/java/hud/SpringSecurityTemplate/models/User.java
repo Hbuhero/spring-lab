@@ -63,6 +63,9 @@ public class User {
     @JsonIgnore
     private String otp;
 
+    @Column(name = "IS_OTP_VERIFIED")
+    private Boolean isOtpVerified = false;
+
     @Column(name = "OTP_EXPIRATION")
     @JsonIgnore
     private LocalDateTime otpExpiration = LocalDateTime.now();

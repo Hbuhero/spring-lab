@@ -1,5 +1,6 @@
 package hud.SpringSecurityTemplate.services;
 
+import io.jsonwebtoken.lang.Maps;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import org.slf4j.Logger;
@@ -14,6 +15,8 @@ import org.springframework.stereotype.Service;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 
+import java.time.Year;
+import java.util.HashMap;
 import java.util.Map;
 
 @Service
@@ -30,10 +33,10 @@ public class EmailService {
     @Value("${spring.mail.username}")
     private String fromEmail;
 
-    @Value("${app.name:ShambaBoraGateway}")
+    @Value("${app.name}")
     private String appName;
 
-    @Value("${app.url:http://localhost:8080}")
+    @Value("${app.url}")
     private String appUrl;
 
     /**
@@ -61,16 +64,20 @@ public class EmailService {
      */
     public void sendHtmlEmail(String to, String subject, String templateName, Map<String, Object> variables) {
         try {
+
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-            
+
+            logger.info("Inside the main email sender method: {}", variables);
+            var newVars = new HashMap<>(variables);
             // Add common variables
-            variables.put("appName", appName);
-            variables.put("appUrl", appUrl);
-            variables.put("year", java.time.Year.now().getValue());
+            newVars.put("appName", appName);
+            newVars.put("appUrl", appUrl);
+            newVars.put("year", java.time.Year.now().getValue());
+
             
             Context context = new Context();
-            context.setVariables(variables);
+            context.setVariables(newVars);
             
             String htmlContent = templateEngine.process(templateName, context);
             
@@ -97,6 +104,8 @@ public class EmailService {
                 "lastName", lastName != null ? lastName : "",
                 "fullName", (firstName != null ? firstName : "") + " " + (lastName != null ? lastName : "").trim()
             );
+
+            logger.info("Welcome email sending successfully to: {}", to);
             
              sendHtmlEmail(to, "Welcome to " + appName, "welcome-email", variables);
         } catch (Exception e) {
@@ -212,7 +221,7 @@ public class EmailService {
     @Async
     public void sendVerificationEmail(String to, String firstName, String verificationToken) {
         try {
-            String verificationUrl = appUrl + "/verify-email?token=" + verificationToken;
+            String verificationUrl = appUrl + "/activate-account?token=" + verificationToken;
             
             Map<String, Object> variables = Map.of(
                 "firstName", firstName != null ? firstName : "User",
@@ -220,9 +229,9 @@ public class EmailService {
                 "verificationToken", verificationToken
             );
             
-            sendHtmlEmail(to, "Email Verification - " + appName, "email-verification", variables);
+            sendHtmlEmail(to, "Email Verification - " + appName, "email/email-verification", variables);
         } catch (Exception e) {
-            logger.error("Failed to send verification email to: {}. Error: {}", to, e.getMessage());
+            logger.error("Failed to send verification email error: {}.", e.toString());
             String verificationUrl = appUrl + "/verify-email?token=" + verificationToken;
             sendSimpleEmail(to, "Email Verification - " + appName,
                 "Dear " + (firstName != null ? firstName : "User") + ",\n\n" +

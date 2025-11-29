@@ -1,7 +1,6 @@
 package hud.SpringSecurityTemplate.controllers;
 
 import hud.SpringSecurityTemplate.models.User;
-
 import hud.SpringSecurityTemplate.models.UserStatus;
 import hud.SpringSecurityTemplate.payloads.requests.auth.*;
 import hud.SpringSecurityTemplate.payloads.requests.user.UserRequest;
@@ -25,17 +24,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-
+import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Controller
 @RequestMapping(Constants.API_V1 + "/auth")
@@ -59,7 +51,18 @@ public class AuthController {
     @Autowired
     private EmailService emailService;
 
-
+    private static LoginResponse.UserResponse getUserInformation(User user) {
+        LoginResponse.UserResponse userResponse = new LoginResponse.UserResponse();
+        userResponse.setId(user.getId());
+        userResponse.setName(user.getFullName());
+        userResponse.setEmail(user.getEmail());
+        userResponse.setPhoneNumber(user.getPhoneNumber());
+        userResponse.setRole(user.getRole());
+        userResponse.setPasswordReset(user.getPasswordChanged());
+        userResponse.setCreatedAt(user.getCreatedAt());
+        userResponse.setStatus(user.getStatus().name());
+        return userResponse;
+    }
 
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
@@ -91,12 +94,7 @@ public class AuthController {
             user.setRefreshTokenExpiration(LocalDateTime.now().plusDays(30));
             userRepository.save(user);
 
-            LoginResponse response = new LoginResponse();
-            response.setUser(getUserInformation(user));
-            response.setToken(jwtResponse.getToken());
-            response.setTokenExpiration(jwtResponse.getTokenExpiration().toString());
-            response.setRefreshToken(refreshToken);
-            return new ResponseEntity<>(response, HttpStatus.OK);
+            return createLoginResponse(user, refreshToken, jwtResponse);
 
         } catch (BadCredentialsException e) {
             return new ResponseEntity<>(new Message("Invalid email or password"), HttpStatus.UNAUTHORIZED);
@@ -108,7 +106,7 @@ public class AuthController {
     @PostMapping("/signup")
     @PreAuthorize("permitAll()")
     public ResponseEntity<?> registerUser(@Valid @RequestBody UserRequest signupRequest) {
-        System.out.println("in here");
+
         if (signupRequest.getPassword() == null || signupRequest.getPassword().isBlank()) {
             return new ResponseEntity<>(new Message("Password cannot be blank"), HttpStatus.BAD_REQUEST);
         }
@@ -129,27 +127,26 @@ public class AuthController {
         user.setEmail(signupRequest.getEmail());
         user.setPhoneNumber(signupRequest.getPhoneNumber());
         user.setPassword(passwordEncoder.encode(signupRequest.getPassword()));
-        user.setRole(signupRequest.getRole());
+        user.setRole("USER");
         user.setStatus(UserStatus.PENDING);
         user.setProvider("secure system");
 
-        // set verification code for authentication
-        user.setOtp(UUID.randomUUID().toString().substring(0, 5));
-        user.setOtpExpiration(LocalDateTime.now().plusMinutes(10));
+        user.setPasswordResetToken(UUID.randomUUID().toString());
+        user.setPasswordResetTokenExpiration(LocalDateTime.now().plusMinutes(30));
 
         User savedUser = userRepository.save(user);
-        
+
         // Send verification email  asynchronously
         try {
             emailService.sendVerificationEmail(savedUser.getEmail(),
-                savedUser.getFullName() != null ? savedUser.getFullName().split(" ")[0] : "User",
-                savedUser.getOtp()
+                    savedUser.getFullName() != null ? savedUser.getFullName().split(" ")[0] : "User",
+                    savedUser.getPasswordResetToken()
             );
         } catch (Exception e) {
             // Log error but don't fail registration
             System.err.println("Failed to send welcome email: " + e.getMessage());
         }
-        
+
         SignupResponse response = new SignupResponse();
         response.setMessage("User registered successfully");
         response.setEmail(savedUser.getEmail());
@@ -159,26 +156,26 @@ public class AuthController {
     }
 
     @PostMapping("/activate-account")
-    public ResponseEntity<?> activateAccount(@Valid @RequestBody ActivationRequest activationRequest){
+    public ResponseEntity<?> activateAccount(@RequestParam("token") String token) {
         // Check if user exists
-        Optional<User> userOptional = userRepository.findByEmail(activationRequest.getEmail());
-        if (userOptional.isEmpty()) {
-            return new ResponseEntity<>(new Message("User not found with email: " + activationRequest.getEmail()), HttpStatus.BAD_REQUEST);
-        }
+        Optional<User> userOptional = userRepository.findByPasswordResetToken(token);
 
+        if (userOptional.isEmpty()) {
+            return new ResponseEntity<>(new Message("Invalid account activation token"), HttpStatus.BAD_REQUEST);
+        }
         User user = userOptional.get();
 
         // check if otp is expired
-        if (LocalDateTime.now().isAfter(user.getOtpExpiration())) { // 13:12 , 13:19
-            return new ResponseEntity<>(new Message("OTP is expired. Please provide a valid OTP"), HttpStatus.BAD_REQUEST);
-        }
-        if (!user.getOtp().equalsIgnoreCase(activationRequest.getOtp())) {
-            return new ResponseEntity<>(new Message("Invalid OTP. Please provide a valid OTP"), HttpStatus.BAD_REQUEST);
+        if (LocalDateTime.now().isAfter(user.getPasswordResetTokenExpiration())) {
+            return new ResponseEntity<>(new Message("Token is expired. Please provide a valid token"), HttpStatus.BAD_REQUEST);
         }
 
-        user.setOtp(null);
-        user.setOtpExpiration(null);
+        user.setPasswordResetToken(null);
+        user.setPasswordResetTokenExpiration(null);
         user.setStatus(UserStatus.ACTIVE);
+        String refreshToken = UUID.randomUUID().toString();
+        user.setRefreshToken(refreshToken);
+        user.setRefreshTokenExpiration(LocalDateTime.now().plusDays(30));
         userRepository.save(user);
 
         // Send welcome email  asynchronously
@@ -192,13 +189,47 @@ public class AuthController {
             System.err.println("Failed to send welcome email: " + e.getMessage());
         }
 
-        return new ResponseEntity<>(HttpStatus.OK);
+        JwtResponse jwtResponse = jwtProvider.generateJwtTokenByUser(user.getId());
+
+        return createLoginResponse(user, refreshToken, jwtResponse);
+    }
+
+    @PostMapping("/resend-verification-email/{email}")
+    public ResponseEntity<?> resendVerificationEmail(@PathVariable("email") String email) {
+        Optional<User> userOptional = userRepository.findByEmail(email);
+        if (userOptional.isEmpty()) {
+            return new ResponseEntity<>(new Message("User with email " + email + " is not found"), HttpStatus.BAD_REQUEST);
+        }
+
+        User user = userOptional.get();
+
+        if (user.getPasswordResetToken() == null) {
+            return new ResponseEntity<>(new Message("Activation Request already processed"), HttpStatus.BAD_REQUEST);
+        }
+
+        user.setPasswordResetToken(UUID.randomUUID().toString());
+        user.setPasswordResetTokenExpiration(LocalDateTime.now().plusMinutes(30));
+
+        User savedUser = userRepository.save(user);
+
+        // Send verification email  asynchronously
+        try {
+            emailService.sendVerificationEmail(savedUser.getEmail(),
+                    savedUser.getFullName() != null ? savedUser.getFullName().split(" ")[0] : "User",
+                    savedUser.getPasswordResetToken()
+            );
+        } catch (Exception e) {
+            // Log error but don't fail registration
+            System.err.println("Failed to send welcome email: " + e.getMessage());
+        }
+
+        return new ResponseEntity<>(new Message("Verification email has been sent"), HttpStatus.OK);
     }
 
     @PostMapping("/refresh-token")
     public ResponseEntity<?> refreshToken(@Valid @RequestBody RefreshTokenRequest refreshTokenRequest) {
         Optional<User> userOptional = userRepository.findByRefreshToken(refreshTokenRequest.getRefreshToken());
-        
+
         if (userOptional.isEmpty()) {
             return new ResponseEntity<>(new Message("Invalid refresh token"), HttpStatus.BAD_REQUEST);
         }
@@ -219,18 +250,13 @@ public class AuthController {
         user.setRefreshTokenExpiration(LocalDateTime.now().plusDays(30));
         userRepository.save(user);
 
-        LoginResponse response = new LoginResponse();
-        response.setUser(getUserInformation(user));
-        response.setToken(jwtResponse.getToken());
-        response.setTokenExpiration(jwtResponse.getTokenExpiration().toString());
-        response.setRefreshToken(newRefreshToken);
-        return new ResponseEntity<>(response, HttpStatus.OK);
+        return createLoginResponse(user, newRefreshToken, jwtResponse);
     }
 
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@Valid @RequestBody PasswordResetRequest passwordResetRequest) {
         Optional<User> userOptional = userRepository.findByEmail(passwordResetRequest.getEmail());
-        
+
         if (userOptional.isEmpty()) {
             return new ResponseEntity<>(new Message("User not found with email: " + passwordResetRequest.getEmail()), HttpStatus.BAD_REQUEST);
         }
@@ -238,46 +264,102 @@ public class AuthController {
         User user = userOptional.get();
 
         // Generate password reset token
-        String resetToken = UUID.randomUUID().toString();
-        user.setPasswordResetToken(resetToken);
-        user.setPasswordResetTokenExpiration(LocalDateTime.now().plusHours(24)); // Token expires in 24 hours
+        String otp = String.valueOf(new Random().nextInt(100001, 999999));
+        user.setOtp(otp);
+        user.setOtpExpiration(LocalDateTime.now().plusMinutes(30)); // Token expires in 24 hours
+        user.setIsOtpVerified(false);
         userRepository.save(user);
 
         // Send password reset email asynchronously
         try {
-            logger.info("Password reset token: " + resetToken);
-            emailService.sendPasswordResetEmail(user.getEmail(), user.getFullName(), resetToken);
+            emailService.sendPasswordResetEmail(user.getEmail(), user.getFullName(), otp);
         } catch (Exception e) {
             logger.error("Failed to send password reset email: " + e.getMessage());
             return new ResponseEntity<>(new Message("Failed to send password reset email. Please try again later."), HttpStatus.INTERNAL_SERVER_ERROR);
         }
-        
+
         PasswordResetResponse response = new PasswordResetResponse();
         response.setMessage("Password reset instructions have been sent to your email");
         response.setEmail(passwordResetRequest.getEmail());
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
+    @PostMapping("/resend-otp/{email}")
+    public ResponseEntity<?> resendOtp(@PathVariable("email") String email) {
+        Optional<User> userOptional = userRepository.findByEmail(email);
+        if (userOptional.isEmpty()) {
+            return new ResponseEntity<>(new Message("User not found with email: " + email), HttpStatus.BAD_REQUEST);
+        }
+        User user = userOptional.get();
+
+        if (user.getOtp() == null) {
+            return new ResponseEntity<>(new Message("OTP request is already verified."), HttpStatus.BAD_REQUEST);
+        }
+
+        user.setOtp(String.valueOf(new Random().nextInt(100001, 999999)));
+        user.setOtpExpiration(LocalDateTime.now().plusMinutes(30));
+        user.setIsOtpVerified(false);
+
+        User savedUser = userRepository.save(user);
+        try {
+            emailService.sendVerificationEmail(savedUser.getEmail(),
+                    savedUser.getFullName() != null ? savedUser.getFullName().split(" ")[0] : "User",
+                    savedUser.getOtp()
+            );
+        } catch (Exception e) {
+            // Log error but don't fail registration
+            System.err.println("Failed to send welcome email: " + e.getMessage());
+        }
+
+        return new ResponseEntity<>(new Message("OTP sent successfully"), HttpStatus.OK);
+    }
+
+    @PostMapping("/validate-otp")
+    public ResponseEntity<?> validateOTP (@Valid @RequestBody OTPValidationRequest otpValidationRequest) {
+        Optional<User> userOptional = userRepository.findByEmail(otpValidationRequest.getEmail());
+        if (userOptional.isEmpty()) {
+            return new ResponseEntity<>(new Message("User not found with email: " + otpValidationRequest.getEmail()), HttpStatus.BAD_REQUEST);
+        }
+
+        User user = userOptional.get();
+
+        if (user.getIsOtpVerified()) {
+            return new ResponseEntity<>(new Message("OTP is already verified."), HttpStatus.BAD_REQUEST);
+        }
+
+        if (user.getOtpExpiration() != null && user.getOtpExpiration().isBefore(LocalDateTime.now())) {
+            return new ResponseEntity<>(new Message("OTP is expired"), HttpStatus.BAD_REQUEST);
+        }
+
+        if (user.getOtp() != null && !user.getOtp().equals(otpValidationRequest.getOtp())) {
+            return new ResponseEntity<>(new Message("Invalid OTP."), HttpStatus.BAD_REQUEST);
+        }
+
+        user.setOtpExpiration(null);
+        user.setOtp(null);
+        user.setIsOtpVerified(true);
+        userRepository.save(user);
+        return new ResponseEntity<>(new Message("OTP has been validated"), HttpStatus.OK);
+    }
+
     @PostMapping("/reset-password")
     public ResponseEntity<?> resetPassword(@Valid @RequestBody PasswordResetConfirmRequest passwordResetConfirmRequest) {
-        Optional<User> userOptional = userRepository.findByPasswordResetToken(passwordResetConfirmRequest.getToken());
-        
+        Optional<User> userOptional = userRepository.findByEmail(passwordResetConfirmRequest.getEmail());
         if (userOptional.isEmpty()) {
-            return new ResponseEntity<>(new Message("Invalid password reset token"), HttpStatus.BAD_REQUEST);
+            return new ResponseEntity<>(new Message("User not found with email: " + passwordResetConfirmRequest.getEmail()), HttpStatus.BAD_REQUEST);
         }
 
         User user = userOptional.get();
 
         // Check if token is expired
-        if (user.getPasswordResetTokenExpiration().isBefore(LocalDateTime.now())) {
-            return new ResponseEntity<>(new Message("Password reset token has expired"), HttpStatus.BAD_REQUEST);
+        if (!user.getIsOtpVerified()) {
+            return new ResponseEntity<>(new Message("Invalid Request"), HttpStatus.BAD_REQUEST);
         }
 
         // Update password
         user.setPassword(passwordEncoder.encode(passwordResetConfirmRequest.getNewPassword()));
-        user.setPasswordResetToken(null);
-        user.setPasswordResetTokenExpiration(null);
-        
+        user.setIsOtpVerified(false);
+
         // Invalidate all refresh tokens for security
         user.setRefreshToken(null);
         user.setRefreshTokenExpiration(null);
@@ -295,13 +377,15 @@ public class AuthController {
 
     @PostMapping("/change-password")
     public ResponseEntity<?> changePassword(@Valid @RequestBody ChangePasswordRequest changePasswordRequest,
-                                          @CurrentUser UserPrincipal currentUser) {
+                                            @CurrentUser UserPrincipal currentUser) {
         Optional<User> userOptional = userRepository.findById(currentUser.getId());
         if (userOptional.isEmpty()) {
             return new ResponseEntity<>(new Message("Please provide a valid authorization token"), HttpStatus.BAD_REQUEST);
         }
 
         User user = userOptional.get();
+
+        // check current password
         if (!passwordEncoder.matches(changePasswordRequest.getCurrentPassword(), user.getPassword())) {
             return new ResponseEntity<>(new Message("Current password is incorrect"), HttpStatus.BAD_REQUEST);
         }
@@ -312,21 +396,21 @@ public class AuthController {
         user.setRefreshToken(null);
         user.setRefreshTokenExpiration(null);
         userRepository.save(user);
-        
+
         // Send password change confirmation email
         try {
             emailService.sendPasswordChangeConfirmationEmail(user.getEmail(), user.getFullName());
         } catch (Exception e) {
             System.err.println("Failed to send password change confirmation email: " + e.getMessage());
         }
-        
+
         return new ResponseEntity<>(new Message("Password changed successfully"), HttpStatus.OK);
     }
 
     @PostMapping("/logout")
     public ResponseEntity<?> logout(@CurrentUser UserPrincipal currentUser) {
         Optional<User> userOptional = userRepository.findById(currentUser.getId());
-        
+
         if (userOptional.isPresent()) {
             User user = userOptional.get();
             user.setRefreshToken(null);
@@ -340,7 +424,7 @@ public class AuthController {
     @GetMapping("/profile")
     public ResponseEntity<?> getUserProfile(@CurrentUser UserPrincipal currentUser) {
         Optional<User> userOptional = userRepository.findById(currentUser.getId());
-        
+
         if (userOptional.isEmpty()) {
             return new ResponseEntity<>(new Message("User not found"), HttpStatus.BAD_REQUEST);
         }
@@ -359,17 +443,13 @@ public class AuthController {
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
-    private static  LoginResponse.UserResponse getUserInformation(User user) {
-        LoginResponse.UserResponse userResponse = new LoginResponse.UserResponse();
-        userResponse.setId(user.getId());
-        userResponse.setName(user.getFullName());
-        userResponse.setEmail(user.getEmail());
-        userResponse.setPhoneNumber(user.getPhoneNumber());
-        userResponse.setRole(user.getRole());
-        userResponse.setPasswordReset(user.getPasswordChanged());
-        userResponse.setCreatedAt(user.getCreatedAt());
-        userResponse.setStatus(user.getStatus().name());
-        return userResponse;
+    private ResponseEntity<?> createLoginResponse(User user, String refreshToken, JwtResponse jwtResponse) {
+        LoginResponse response = new LoginResponse();
+        response.setUser(getUserInformation(user));
+        response.setToken(jwtResponse.getToken());
+        response.setTokenExpiration(jwtResponse.getTokenExpiration().toString());
+        response.setRefreshToken(refreshToken);
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
 }

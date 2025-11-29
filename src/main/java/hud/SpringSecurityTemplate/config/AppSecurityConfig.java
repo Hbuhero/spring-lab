@@ -13,6 +13,7 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
@@ -42,7 +43,7 @@ public class AppSecurityConfig {
     CorsFilter corsFilter;
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, AuthenticationEntryPoint authenticationEntryPoint) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(corsPolicy -> corsPolicy.configure(http))
@@ -53,16 +54,22 @@ public class AppSecurityConfig {
                         .requestMatchers("/api/v1/livestock/**").permitAll()
                         .anyRequest().authenticated()
                 )
-                .formLogin(form -> form
-                                .loginProcessingUrl("/api/v1/auth/login")
-                                .isCustomLoginPage()
-                        )
+
+                /*
+                  allowing this here is wrong, since any login request outside the form defined here
+                  will automatically be pointed to oauth2Login below making a potential valid request always fail
+                 */
+//                .formLogin(form -> form
+//                                .loginProcessingUrl("/api/v1/auth/login")
+//                        )
                 .oauth2Login(oauth2 -> oauth2
                         .successHandler(customOAuth2AuthorizationSuccessHandler)
-                        .redirectionEndpoint(Customizer.withDefaults())
-
                 )
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(authenticationEntryPoint)
+
+                );
 
         http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

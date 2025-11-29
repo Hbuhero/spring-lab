@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
-public class ActivationRequest {
+public class OTPValidationRequest {
 
     @Email
     private String email;
