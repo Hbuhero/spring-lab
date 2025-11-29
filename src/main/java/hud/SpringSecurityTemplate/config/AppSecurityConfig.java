@@ -59,17 +59,15 @@ public class AppSecurityConfig {
                   allowing this here is wrong, since any login request outside the form defined here
                   will automatically be pointed to oauth2Login below making a potential valid request always fail
                  */
-//                .formLogin(form -> form
-//                                .loginProcessingUrl("/api/v1/auth/login")
-//                        )
+//                .formLogin(Customizer.withDefaults())
                 .oauth2Login(oauth2 -> oauth2
                         .successHandler(customOAuth2AuthorizationSuccessHandler)
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .exceptionHandling(ex -> ex
-                        .authenticationEntryPoint(authenticationEntryPoint)
-
-                );
+//                .exceptionHandling(ex -> ex
+//                        .authenticationEntryPoint(authenticationEntryPoint)
+//                )
+                ;
 
         http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

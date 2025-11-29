@@ -9,7 +9,9 @@ import hud.SpringSecurityTemplate.repositories.UserRepository;
 import hud.SpringSecurityTemplate.security.CurrentUser;
 import hud.SpringSecurityTemplate.security.JwtProvider;
 import hud.SpringSecurityTemplate.security.UserPrincipal;
+import hud.SpringSecurityTemplate.services.AuthService;
 import hud.SpringSecurityTemplate.services.EmailService;
+import hud.SpringSecurityTemplate.services.UserService;
 import hud.SpringSecurityTemplate.utils.Constants;
 import jakarta.validation.Valid;
 import org.apache.logging.log4j.LogManager;
@@ -51,18 +53,9 @@ public class AuthController {
     @Autowired
     private EmailService emailService;
 
-    private static LoginResponse.UserResponse getUserInformation(User user) {
-        LoginResponse.UserResponse userResponse = new LoginResponse.UserResponse();
-        userResponse.setId(user.getId());
-        userResponse.setName(user.getFullName());
-        userResponse.setEmail(user.getEmail());
-        userResponse.setPhoneNumber(user.getPhoneNumber());
-        userResponse.setRole(user.getRole());
-        userResponse.setPasswordReset(user.getPasswordChanged());
-        userResponse.setCreatedAt(user.getCreatedAt());
-        userResponse.setStatus(user.getStatus().name());
-        return userResponse;
-    }
+    @Autowired
+    private AuthService authService;
+
 
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
@@ -94,7 +87,7 @@ public class AuthController {
             user.setRefreshTokenExpiration(LocalDateTime.now().plusDays(30));
             userRepository.save(user);
 
-            return createLoginResponse(user, refreshToken, jwtResponse);
+            return authService.createLoginResponse(user, refreshToken, jwtResponse);
 
         } catch (BadCredentialsException e) {
             return new ResponseEntity<>(new Message("Invalid email or password"), HttpStatus.UNAUTHORIZED);
@@ -191,7 +184,7 @@ public class AuthController {
 
         JwtResponse jwtResponse = jwtProvider.generateJwtTokenByUser(user.getId());
 
-        return createLoginResponse(user, refreshToken, jwtResponse);
+        return authService.createLoginResponse(user, refreshToken, jwtResponse);
     }
 
     @PostMapping("/resend-verification-email/{email}")
@@ -250,7 +243,7 @@ public class AuthController {
         user.setRefreshTokenExpiration(LocalDateTime.now().plusDays(30));
         userRepository.save(user);
 
-        return createLoginResponse(user, newRefreshToken, jwtResponse);
+        return authService.createLoginResponse(user, newRefreshToken, jwtResponse);
     }
 
     @PostMapping("/forgot-password")
@@ -429,7 +422,7 @@ public class AuthController {
             return new ResponseEntity<>(new Message("User not found"), HttpStatus.BAD_REQUEST);
         }
         User user = userOptional.get();
-        return new ResponseEntity<>(getUserInformation(user), HttpStatus.OK);
+        return new ResponseEntity<>(AuthService.getUserInformation(user), HttpStatus.OK);
     }
 
     @GetMapping("/validate-token")
@@ -443,14 +436,7 @@ public class AuthController {
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
-    private ResponseEntity<?> createLoginResponse(User user, String refreshToken, JwtResponse jwtResponse) {
-        LoginResponse response = new LoginResponse();
-        response.setUser(getUserInformation(user));
-        response.setToken(jwtResponse.getToken());
-        response.setTokenExpiration(jwtResponse.getTokenExpiration().toString());
-        response.setRefreshToken(refreshToken);
-        return new ResponseEntity<>(response, HttpStatus.OK);
-    }
+
 
 }
 
