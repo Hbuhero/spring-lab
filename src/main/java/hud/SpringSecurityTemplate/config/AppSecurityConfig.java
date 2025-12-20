@@ -49,24 +49,17 @@ public class AppSecurityConfig {
                 .cors(corsPolicy -> corsPolicy.configure(http))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**").permitAll()
-                        .requestMatchers("/api/v1/kafka/**").permitAll()
-                        .requestMatchers("/api/v1/dynamic-urls/**").permitAll()
-                        .requestMatchers("/api/v1/livestock/**").permitAll()
+                        .requestMatchers("/login").permitAll()
                         .anyRequest().authenticated()
                 )
 
-                /*
-                  allowing this here is wrong, since any login request outside the form defined here
-                  will automatically be pointed to oauth2Login below making a potential valid request always fail
-                 */
-//                .formLogin(Customizer.withDefaults())
                 .oauth2Login(oauth2 -> oauth2
                         .successHandler(customOAuth2AuthorizationSuccessHandler)
                 )
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-//                .exceptionHandling(ex -> ex
-//                        .authenticationEntryPoint(authenticationEntryPoint)
-//                )
                 ;
 
         http.addFilterBefore(jwtRequestFilter, UsernamePasswordAuthenticationFilter.class);
