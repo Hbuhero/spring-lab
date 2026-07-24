@@ -32,6 +32,12 @@ public class FileUpload {
     @Column(name = "file_name", nullable = false)
     private String fileName;
 
+    @Column(name = "ORIGINAL_FILE_NAME")
+    private String originalFileName;
+
+    @Column(name = "FILE_SIZE")
+    private Long fileSize;
+
     @CreationTimestamp
     @Column(name = "CREATED_AT")
     private LocalDateTime createdAt;

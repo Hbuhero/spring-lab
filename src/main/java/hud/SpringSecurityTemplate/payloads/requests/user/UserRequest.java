@@ -29,4 +29,6 @@ public class UserRequest {
     private String permissions;
 
     private String status;
+
+    private String image;
 }

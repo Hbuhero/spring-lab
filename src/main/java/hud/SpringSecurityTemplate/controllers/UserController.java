@@ -5,11 +5,13 @@ import hud.SpringSecurityTemplate.models.UserStatus;
 import hud.SpringSecurityTemplate.payloads.requests.auth.AdminPasswordResetRequest;
 import hud.SpringSecurityTemplate.payloads.requests.user.UserRequest;
 import hud.SpringSecurityTemplate.payloads.requests.user.UserRoleRequest;
+import hud.SpringSecurityTemplate.payloads.responses.LoginResponse;
 import hud.SpringSecurityTemplate.payloads.responses.Message;
 import hud.SpringSecurityTemplate.payloads.responses.UserResponse;
 import hud.SpringSecurityTemplate.repositories.UserRepository;
 import hud.SpringSecurityTemplate.security.CurrentUser;
 import hud.SpringSecurityTemplate.security.UserPrincipal;
+import hud.SpringSecurityTemplate.services.AuthService;
 import hud.SpringSecurityTemplate.services.EmailService;
 import hud.SpringSecurityTemplate.utils.Constants;
 import hud.SpringSecurityTemplate.utils.PageableConfig;
@@ -30,27 +32,22 @@ import org.springframework.web.bind.annotation.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static hud.SpringSecurityTemplate.models.UserStatus.*;
+
 @Controller
 @RequestMapping(Constants.API_V1 + "/users")
 public class UserController {
 
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
+    private final PageableConfig pageableConfig;
 
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private EmailService emailService;
-
-
-    @Autowired
-    private PageableConfig pageableConfig;
-
-    @GetMapping("/ok")
-    public ResponseEntity<?> ok(){
-        return ResponseEntity.ok().body("the is the new oauth");
+    public UserController(UserRepository userRepository, PasswordEncoder passwordEncoder, EmailService emailService, PageableConfig pageableConfig) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.emailService = emailService;
+        this.pageableConfig = pageableConfig;
     }
 
     @GetMapping
@@ -59,19 +56,16 @@ public class UserController {
             PageableParam pageableParam,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String role,
-            @RequestParam(required = false) Long mcu,
-            @RequestParam(required = false) Long amcos,
-            @RequestParam(required = false) String search) {
-
+            @RequestParam(required = false) String search
+    ) {
         try {
-
             Pageable pageable = pageableConfig.pageable(pageableParam);
             Page<User> userPage = userRepository.findAll(pageable);
 
-            List<UserResponse> userResponses = userPage.getContent().stream()
+            List<LoginResponse.UserResponse> userResponses = userPage.getContent().stream()
                 .filter(user -> {
                     boolean matches = true;
-                    if (status != null) matches = matches && status.equals(user.getStatus().name());
+                    if (status != null) matches = matches && status.equals(user.getStatus());
                     if (role != null) matches = matches && role.equals(user.getRole());
                     if (search != null && !search.trim().isEmpty()) {
                         String searchLower = search.toLowerCase();
@@ -80,10 +74,10 @@ public class UserController {
                     }
                     return matches;
                 })
-                .map(this::convertToUserResponse)
+                .map(AuthService::getUserInformation)
                 .collect(Collectors.toList());
 
-            PageResponse<UserResponse> pageResponse = new PageResponse<>();
+            PageResponse<LoginResponse.UserResponse> pageResponse = new PageResponse<>();
             pageResponse.setPage(new hud.SpringSecurityTemplate.utils.pagination.Page(
                     String.valueOf(userPage.getNumber()),
                     String.valueOf(userPage.getNumberOfElements()),
@@ -113,7 +107,7 @@ public class UserController {
                 HttpStatus.NOT_FOUND);
         }
 
-        UserResponse userResponse = convertToUserResponse(userOptional.get());
+        LoginResponse.UserResponse userResponse = AuthService.getUserInformation(userOptional.get());
         return new ResponseEntity<>(userResponse, HttpStatus.OK);
     }
 
@@ -143,12 +137,12 @@ public class UserController {
             user.setRole(signupRequest.getRole());
 
             user.setPermissions(signupRequest.getPermissions());
-            user.setStatus(UserStatus.ACTIVE);
+            user.setStatus(ACTIVE.name());
             user.setProvider("secure system");
             user.setPasswordChanged(false);
 
             User savedUser = userRepository.save(user);
-            UserResponse userResponse = convertToUserResponse(savedUser);
+            LoginResponse.UserResponse userResponse = AuthService.getUserInformation(savedUser);
 
             return new ResponseEntity<>(userResponse, HttpStatus.CREATED);
 
@@ -198,7 +192,7 @@ public class UserController {
             }
 
             User savedUser = userRepository.save(user);
-            UserResponse userResponse = convertToUserResponse(savedUser);
+            LoginResponse.UserResponse userResponse = AuthService.getUserInformation(savedUser);
 
             return new ResponseEntity<>(userResponse, HttpStatus.OK);
 
@@ -347,7 +341,7 @@ public class UserController {
             user.setRefreshTokenExpiration(null);
 
             User savedUser = userRepository.save(user);
-            UserResponse userResponse = convertToUserResponse(savedUser);
+            LoginResponse.UserResponse userResponse = AuthService.getUserInformation(savedUser);
 
             return new ResponseEntity<>(userResponse, HttpStatus.OK);
 
@@ -366,9 +360,9 @@ public class UserController {
             
             Map<String, Object> stats = new HashMap<>();
             stats.put("totalUsers", totalUsers);
-            stats.put("activeUsers", allUsers.stream().filter(u -> "ACTIVE".equals(u.getStatus().name())).count());
-            stats.put("disabledUsers", allUsers.stream().filter(u -> "DISABLED".equals(u.getStatus().name())).count());
-            stats.put("suspendedUsers", allUsers.stream().filter(u -> "SUSPENDED".equals(u.getStatus().name())).count());
+            stats.put("activeUsers", allUsers.stream().filter(u -> "ACTIVE".equals(u.getStatus())).count());
+            stats.put("disabledUsers", allUsers.stream().filter(u -> "DISABLED".equals(u.getStatus())).count());
+            stats.put("suspendedUsers", allUsers.stream().filter(u -> "SUSPENDED".equals(u.getStatus())).count());
             
             // Role-based stats
             Map<String, Long> roleStats = new HashMap<>();
@@ -395,7 +389,7 @@ public class UserController {
 
         try {
             User user = userOptional.get();
-            user.setStatus(UserStatus.valueOf(status));
+            user.setStatus(status);
 
             // If disabling or suspending, clear refresh tokens
             if ("DISABLED".equals(status) || "SUSPENDED".equals(status)) {
@@ -412,7 +406,7 @@ public class UserController {
                 System.err.println("Failed to send account status email: " + e.getMessage());
             }
             
-            UserResponse userResponse = convertToUserResponse(savedUser);
+            LoginResponse.UserResponse userResponse = AuthService.getUserInformation(savedUser);
 
             Map<String, Object> response = new HashMap<>();
             response.put("message", "User status updated successfully");
@@ -425,24 +419,6 @@ public class UserController {
             return new ResponseEntity<>(new Message("Error updating user status: " + e.getMessage()), 
                 HttpStatus.INTERNAL_SERVER_ERROR);
         }
-    }
-
-    private UserResponse convertToUserResponse(User user) {
-
-
-        UserResponse response = new UserResponse();
-        response.setId(user.getId());
-        response.setName(user.getFullName());
-        response.setEmail(user.getEmail());
-        response.setPhoneNumber(user.getPhoneNumber());
-        response.setRole(user.getRole());
-        response.setPermissions(user.getPermissions());
-        response.setStatus(user.getStatus().name());
-        response.setPasswordReset(user.getPasswordChanged());
-        response.setCreatedAt(user.getCreatedAt());
-        response.setUpdatedAt(user.getUpdatedAt());
-
-        return response;
     }
 
     private String generateTemporaryPassword() {

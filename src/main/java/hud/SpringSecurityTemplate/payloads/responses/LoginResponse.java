@@ -25,6 +25,7 @@ public class LoginResponse {
         private String email;
         private String phoneNumber;
         private String role;
+        private String permissions;
         private Boolean passwordReset;
         private LocalDateTime createdAt;
         private String status;

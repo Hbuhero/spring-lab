@@ -17,9 +17,10 @@ public class AuthService {
         userResponse.setEmail(user.getEmail());
         userResponse.setPhoneNumber(user.getPhoneNumber());
         userResponse.setRole(user.getRole());
+        userResponse.setPermissions(user.getPermissions());
         userResponse.setPasswordReset(user.getPasswordChanged());
         userResponse.setCreatedAt(user.getCreatedAt());
-        userResponse.setStatus(user.getStatus().name());
+        userResponse.setStatus(user.getStatus());
         return userResponse;
     }
 

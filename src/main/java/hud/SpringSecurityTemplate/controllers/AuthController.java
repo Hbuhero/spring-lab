@@ -13,6 +13,7 @@ import hud.SpringSecurityTemplate.services.AuthService;
 import hud.SpringSecurityTemplate.services.EmailService;
 import hud.SpringSecurityTemplate.services.UserService;
 import hud.SpringSecurityTemplate.utils.Constants;
+import hud.SpringSecurityTemplate.utils.OAuthExchangeCodeUtil;
 import jakarta.validation.Valid;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -24,6 +25,8 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
@@ -36,28 +39,41 @@ import java.util.*;
 public class AuthController {
 
     static Logger logger = LogManager.getLogger(AuthController.class);
+    private final AuthenticationManager authenticationManager;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtProvider jwtProvider;
+    private final EmailService emailService;
+    private final AuthService authService;
 
-    @Autowired
-    private AuthenticationManager authenticationManager;
+    public AuthController(
+            AuthenticationManager authenticationManager,
+            UserRepository userRepository,
+            PasswordEncoder passwordEncoder,
+            JwtProvider jwtProvider,
+            EmailService emailService,
+            AuthService authService
+    ) {
+        this.authenticationManager = authenticationManager;
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtProvider = jwtProvider;
+        this.emailService = emailService;
+        this.authService = authService;
+    }
 
-    @Autowired
-    private UserRepository userRepository;
+    @GetMapping("/profile")
+    public ResponseEntity<?> getUserProfile(@CurrentUser UserPrincipal currentUser) {
+        Optional<User> userOptional = userRepository.findById(currentUser.getId());
 
+        if (userOptional.isEmpty()) {
+            return new ResponseEntity<>(new Message("User not found"), HttpStatus.BAD_REQUEST);
+        }
+        User user = userOptional.get();
+        return new ResponseEntity<>(AuthService.getUserInformation(user), HttpStatus.OK);
+    }
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private JwtProvider jwtProvider;
-
-    @Autowired
-    private EmailService emailService;
-
-    @Autowired
-    private AuthService authService;
-
-
-    @PostMapping("/login")
+    @PostMapping({"/login", "/signin", "/sign-in"})
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
         try {
             // Check if user exists
@@ -69,7 +85,7 @@ public class AuthController {
             User user = userOptional.get();
 
             // Check if user is active
-            if (!"ACTIVE".equals(user.getStatus().name())) {
+            if (!UserStatus.ACTIVE.name().equals(user.getStatus())) {
                 return new ResponseEntity<>(new Message("User account is not active"), HttpStatus.BAD_REQUEST);
             }
 
@@ -96,7 +112,30 @@ public class AuthController {
         }
     }
 
-    @PostMapping("/signup")
+    @PostMapping("/exchange")
+    public ResponseEntity<?> exchange(@RequestParam(value = "code") String code) {
+        String hashedCode = OAuthExchangeCodeUtil.hash(code);
+
+        User user = userRepository.findByOauthExchangeCodeAndOauthExchangeCodeExpirationAfter(hashedCode, LocalDateTime.now())
+                .orElseThrow(() -> new BadCredentialsException("Invalid or expired code"));
+
+        int invalidated = userRepository.invalidateCode(user.getId(), hashedCode);
+        if (invalidated == 0) {
+            throw new BadCredentialsException("Code already used");
+        }
+
+        user.setRefreshToken(UUID.randomUUID().toString());
+        user.setRefreshTokenExpiration(LocalDateTime.now().plusDays(30));
+        userRepository.save(user);
+
+        UserDetails userDetails = UserPrincipal.create(user);
+        var authToken = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+        JwtResponse jwt = jwtProvider.generateJwtToken(authToken);
+
+        return authService.createLoginResponse(user, user.getRefreshToken(), jwt);
+    }
+
+    @PostMapping({"/signup", "/register", "/sign-up"})
     @PreAuthorize("permitAll()")
     public ResponseEntity<?> registerUser(@Valid @RequestBody UserRequest signupRequest) {
 
@@ -121,9 +160,9 @@ public class AuthController {
         user.setPhoneNumber(signupRequest.getPhoneNumber());
         user.setPassword(passwordEncoder.encode(signupRequest.getPassword()));
         user.setRole("USER");
-        user.setStatus(UserStatus.PENDING);
-        user.setProvider("secure system");
-
+        user.setStatus(UserStatus.PENDING.name());
+        user.setProvider(null);
+        user.setImage(signupRequest.getImage() == null ? null : "file:"+signupRequest.getImage());
         user.setPasswordResetToken(UUID.randomUUID().toString());
         user.setPasswordResetTokenExpiration(LocalDateTime.now().plusMinutes(30));
 
@@ -143,7 +182,7 @@ public class AuthController {
         SignupResponse response = new SignupResponse();
         response.setMessage("User registered successfully");
         response.setEmail(savedUser.getEmail());
-        response.setStatus(savedUser.getStatus().name());
+        response.setStatus(savedUser.getStatus());
 
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
@@ -165,7 +204,7 @@ public class AuthController {
 
         user.setPasswordResetToken(null);
         user.setPasswordResetTokenExpiration(null);
-        user.setStatus(UserStatus.ACTIVE);
+        user.setStatus(UserStatus.ACTIVE.name());
         String refreshToken = UUID.randomUUID().toString();
         user.setRefreshToken(refreshToken);
         user.setRefreshTokenExpiration(LocalDateTime.now().plusDays(30));
@@ -244,6 +283,17 @@ public class AuthController {
         userRepository.save(user);
 
         return authService.createLoginResponse(user, newRefreshToken, jwtResponse);
+    }
+
+    @GetMapping("/validate-token")
+    public ResponseEntity<?> validateToken(@CurrentUser UserPrincipal currentUser) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("valid", true);
+        response.put("userId", currentUser.getId());
+        response.put("email", currentUser.getEmail());
+        response.put("role", currentUser.getRole());
+
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
     @PostMapping("/forgot-password")
@@ -369,8 +419,10 @@ public class AuthController {
     }
 
     @PostMapping("/change-password")
-    public ResponseEntity<?> changePassword(@Valid @RequestBody ChangePasswordRequest changePasswordRequest,
-                                            @CurrentUser UserPrincipal currentUser) {
+    public ResponseEntity<?> changePassword(
+            @Valid @RequestBody ChangePasswordRequest changePasswordRequest,
+            @CurrentUser UserPrincipal currentUser)
+    {
         Optional<User> userOptional = userRepository.findById(currentUser.getId());
         if (userOptional.isEmpty()) {
             return new ResponseEntity<>(new Message("Please provide a valid authorization token"), HttpStatus.BAD_REQUEST);
@@ -413,30 +465,6 @@ public class AuthController {
 
         return new ResponseEntity<>(new Message("User logged out successfully"), HttpStatus.OK);
     }
-
-    @GetMapping("/profile")
-    public ResponseEntity<?> getUserProfile(@CurrentUser UserPrincipal currentUser) {
-        Optional<User> userOptional = userRepository.findById(currentUser.getId());
-
-        if (userOptional.isEmpty()) {
-            return new ResponseEntity<>(new Message("User not found"), HttpStatus.BAD_REQUEST);
-        }
-        User user = userOptional.get();
-        return new ResponseEntity<>(AuthService.getUserInformation(user), HttpStatus.OK);
-    }
-
-    @GetMapping("/validate-token")
-    public ResponseEntity<?> validateToken(@CurrentUser UserPrincipal currentUser) {
-        Map<String, Object> response = new HashMap<>();
-        response.put("valid", true);
-        response.put("userId", currentUser.getId());
-        response.put("email", currentUser.getEmail());
-        response.put("role", currentUser.getRole());
-
-        return new ResponseEntity<>(response, HttpStatus.OK);
-    }
-
-
 
 }
 

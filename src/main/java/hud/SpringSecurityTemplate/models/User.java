@@ -33,12 +33,6 @@ public class User {
     @Column(name = "PHONE_NUMBER", unique = true)
     private String phoneNumber;
 
-    @Column(name = "PASSWORD")
-    private String password;
-
-    @Column(name = "PASSWORD_CHANGED")
-    private Boolean passwordChanged=false;
-
     @Column(name = "ROLE")
     private String role;
 
@@ -46,29 +40,20 @@ public class User {
     private String permissions;
 
     @Column(name = "STATUS")
-    @Enumerated(EnumType.STRING)
-    private UserStatus status;
+    private String status;
 
-    @Column(name = "REFRESH_TOKEN")
-    private String refreshToken;
+    @Column(name = "IMAGE")
+    private String image;
 
     @Column(name = "PROVIDER")
     private String provider;
 
-    @JsonIgnore
-    @Column(name = "REFRESH_TOKEN_EXPIRATION")
-    private LocalDateTime refreshTokenExpiration = LocalDateTime.now();
+    @Column(name = "PASSWORD")
+    private String password;
 
-    @Column(name = "OTP")
-    @JsonIgnore
-    private String otp;
-
-    @Column(name = "IS_OTP_VERIFIED")
-    private Boolean isOtpVerified = false;
-
-    @Column(name = "OTP_EXPIRATION")
-    @JsonIgnore
-    private LocalDateTime otpExpiration = LocalDateTime.now();
+    @Builder.Default
+    @Column(name = "PASSWORD_CHANGED")
+    private Boolean passwordChanged=false;
 
     @JsonIgnore
     @Column(name = "PASSWORD_RESET_TOKEN")
@@ -77,6 +62,33 @@ public class User {
     @JsonIgnore
     @Column(name = "PASSWORD_RESET_TOKEN_EXPIRATION")
     private LocalDateTime passwordResetTokenExpiration;
+
+    @Column(name = "REFRESH_TOKEN")
+    private String refreshToken;
+
+    @Builder.Default
+    @JsonIgnore
+    @Column(name = "REFRESH_TOKEN_EXPIRATION")
+    private LocalDateTime refreshTokenExpiration = LocalDateTime.now();
+
+    @Column(name = "OTP")
+    @JsonIgnore
+    private String otp;
+
+    @Builder.Default
+    @Column(name = "IS_OTP_VERIFIED")
+    private Boolean isOtpVerified = false;
+
+    @Builder.Default
+    @Column(name = "OTP_EXPIRATION")
+    @JsonIgnore
+    private LocalDateTime otpExpiration = LocalDateTime.now();
+
+    @Column(name = "OAUTH_EXCHANGE_CODE")
+    private String oauthExchangeCode;
+
+    @Column(name = "OAUTH_EXCHANGE_CODE_EXPIRATION")
+    private LocalDateTime oauthExchangeCodeExpiration;
 
     @CreationTimestamp
     @Column(name = "CREATED_AT")

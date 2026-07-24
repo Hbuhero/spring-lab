@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sign in | Prism</title>
+    <style>
+        :root {
+            --background: #ffffff;
+            --foreground: #0f0f0f;
+            --panel: #0c0e16;
+            --panel-foreground: #ffffff;
+            --muted: #9ca3af;
+            --border: #e5e7eb;
+            --input: #f9f9f8;
+            --primary: #1a1a1a;
+            --primary-foreground: #ffffff;
+            --accent: #6366f1;
+            --accent-soft: #a78bfa;
+            --divider: #e5e7eb;
+            --radius: 10px;
+            --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: var(--background);
+            color: var(--foreground);
+            font-family: var(--font);
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .signin-page {
+            display: flex;
+            min-height: 100vh;
+            background: var(--background);
+        }
+
+        .decorative-panel {
+            position: relative;
+            display: flex;
+            flex: 1;
+            min-height: 100vh;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+            padding: 48px;
+            background: var(--panel);
+        }
+
+        .grid-texture {
+            position: absolute;
+            inset: 0;
+            opacity: 0.05;
+            background-image:
+                linear-gradient(var(--panel-foreground) 1px, transparent 1px),
+                linear-gradient(90deg, var(--panel-foreground) 1px, transparent 1px);
+            background-size: 40px 40px;
+        }
+
+        .glow {
+            position: absolute;
+            border-radius: 999px;
+            filter: blur(64px);
+            pointer-events: none;
+        }
+
+        .glow-primary {
+            top: 128px;
+            left: 64px;
+            width: 288px;
+            height: 288px;
+            opacity: 0.2;
+            background: radial-gradient(circle, var(--accent), transparent);
+        }
+
+        .glow-secondary {
+            right: 32px;
+            bottom: 128px;
+            width: 224px;
+            height: 224px;
+            background: radial-gradient(circle, var(--accent-soft), transparent);
+            animation: glow-pulse 4s ease-in-out infinite;
+        }
+
+        .panel-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--panel-foreground);
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: -0.025em;
+        }
+
+        .eyebrow {
+            margin: 0 0 16px;
+            color: var(--accent);
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 0.1em;
+        }
+
+        .headline {
+            margin: 0 0 24px;
+            color: var(--panel-foreground);
+            font-size: clamp(34px, 4vw, 40px);
+            font-weight: 600;
+            letter-spacing: -0.025em;
+            line-height: 1.12;
+        }
+
+        .headline span {
+            color: var(--accent-soft);
+        }
+
+        .feature-list {
+            display: grid;
+            gap: 24px;
+            margin-top: 40px;
+        }
+
+        .feature {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+        }
+
+        .feature-icon {
+            display: inline-flex;
+            width: 36px;
+            height: 36px;
+            flex: 0 0 36px;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius);
+            background: rgba(99, 102, 241, 0.18);
+            color: var(--accent-soft);
+        }
+
+        .feature-title {
+            margin: 0 0 2px;
+            color: var(--panel-foreground);
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .feature-copy {
+            margin: 0;
+            max-width: 340px;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .testimonial {
+            position: relative;
+            z-index: 1;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding-top: 32px;
+        }
+
+        .quote {
+            margin: 0 0 16px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 13px;
+            font-style: italic;
+            line-height: 1.6;
+        }
+
+        .person {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .avatar {
+            display: inline-flex;
+            width: 32px;
+            height: 32px;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #f7d7d7, #a78bfa);
+            color: #24152d;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .person-name,
+        .person-role {
+            margin: 0;
+            font-size: 12px;
+        }
+
+        .person-name {
+            color: var(--panel-foreground);
+            font-weight: 500;
+        }
+
+        .person-role {
+            color: var(--muted);
+        }
+
+        .form-panel {
+            display: flex;
+            flex: 1;
+            align-items: center;
+            justify-content: center;
+            padding: 64px;
+            background: var(--background);
+        }
+
+        .signin-card {
+            width: 100%;
+            max-width: 384px;
+            animation: fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+        }
+
+        .form-header {
+            margin-bottom: 32px;
+        }
+
+        .form-header h1 {
+            margin: 0 0 6px;
+            color: var(--foreground);
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: -0.025em;
+        }
+
+        .form-header p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .oauth-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+
+        .oauth-button {
+            display: inline-flex;
+            min-height: 42px;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--background);
+            color: var(--foreground);
+            font-size: 13px;
+            font-weight: 500;
+            transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+        }
+
+        .oauth-button:hover,
+        .oauth-button:focus-visible {
+            border-color: #c7c9d1;
+            box-shadow: 0 8px 28px rgba(15, 15, 15, 0.08);
+            transform: translateY(-1px);
+            outline: none;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: "";
+            height: 1px;
+            flex: 1;
+            background: var(--divider);
+        }
+
+        .form {
+            display: grid;
+            gap: 16px;
+        }
+
+        .field-group {
+            display: grid;
+            gap: 6px;
+        }
+
+        .label-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        label {
+            color: var(--foreground);
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .link {
+            border: 0;
+            background: none;
+            color: var(--accent);
+            cursor: pointer;
+            font-size: 12px;
+            padding: 0;
+        }
+
+        .input-wrap {
+            display: flex;
+            align-items: center;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--input);
+            transition: border-color 160ms ease, box-shadow 160ms ease;
+        }
+
+        .input-wrap:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12);
+        }
+
+        .input-wrap input {
+            width: 100%;
+            border: 0;
+            outline: 0;
+            background: transparent;
+            color: var(--foreground);
+            font-size: 13px;
+            padding: 11px 12px;
+        }
+
+        .input-wrap input::placeholder {
+            color: var(--muted);
+        }
+
+        .password-toggle {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 0;
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+            padding: 0 12px;
+        }
+
+        .remember-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 4px 0 8px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .remember-row input {
+            width: 16px;
+            height: 16px;
+            accent-color: var(--accent);
+        }
+
+        .submit-button {
+            width: 100%;
+            min-height: 42px;
+            border: 0;
+            border-radius: var(--radius);
+            background: var(--primary);
+            color: var(--primary-foreground);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: background 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+        }
+
+        .submit-button:hover,
+        .submit-button:focus-visible {
+            background: #000000;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+            transform: translateY(-1px);
+            outline: none;
+        }
+
+        .signup-copy {
+            margin: 20px 0 0;
+            color: var(--muted);
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .signup-copy a {
+            color: var(--foreground);
+            font-weight: 500;
+        }
+
+        .form-message {
+            display: none;
+            border-radius: var(--radius);
+            padding: 10px 12px;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .form-message.is-visible {
+            display: block;
+        }
+
+        .form-message.is-error {
+            background: #fef2f2;
+            color: #991b1b;
+        }
+
+        .form-message.is-success {
+            background: #ecfdf5;
+            color: #065f46;
+        }
+
+        @keyframes fade-up {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes glow-pulse {
+            0%, 100% {
+                opacity: 0.15;
+            }
+            50% {
+                opacity: 0.25;
+            }
+        }
+
+        @media (max-width: 960px) {
+            .decorative-panel {
+                display: none;
+            }
+
+            .form-panel {
+                min-height: 100vh;
+                padding: 40px 24px;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .oauth-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .form-panel {
+                align-items: flex-start;
+                padding: 36px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+<main class="signin-page">
+    <section class="decorative-panel" aria-label="Product benefits">
+        <div class="grid-texture" aria-hidden="true"></div>
+        <div class="glow glow-primary" aria-hidden="true"></div>
+        <div class="glow glow-secondary" aria-hidden="true"></div>
+
+        <div class="panel-content">
+            <a class="logo" href="/" aria-label="Prism home">
+                <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+                    <rect width="32" height="32" rx="8" fill="#ffffff"></rect>
+                    <path d="M9 10h5l3 5-3 5H9l3-5-3-5z" fill="#1a1a1a" opacity="0.5"></path>
+                    <path d="M16 10h7l-3.5 6 3.5 6h-7l3.5-6-3.5-6z" fill="#1a1a1a"></path>
+                </svg>
+                <span>Prism</span>
+            </a>
+        </div>
+
+        <div class="panel-content">
+            <p class="eyebrow">TRUSTED BY 10,000+ TEAMS</p>
+            <h2 class="headline">The auth layer<br><span>your stack deserves.</span></h2>
+
+            <div class="feature-list">
+                <article class="feature">
+                    <span class="feature-icon" aria-hidden="true">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.8" d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path>
+                        </svg>
+                    </span>
+                    <div>
+                        <h3 class="feature-title">Enterprise Security</h3>
+                        <p class="feature-copy">End-to-end encrypted sessions with zero-trust architecture.</p>
+                    </div>
+                </article>
+
+                <article class="feature">
+                    <span class="feature-icon" aria-hidden="true">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.8" d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"></path>
+                        </svg>
+                    </span>
+                    <div>
+                        <h3 class="feature-title">Instant Access</h3>
+                        <p class="feature-copy">Sub-100ms authentication with edge-distributed sessions.</p>
+                    </div>
+                </article>
+
+                <article class="feature">
+                    <span class="feature-icon" aria-hidden="true">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.8" d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"></path>
+                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.8" d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12"></path>
+                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.8" d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17"></path>
+                        </svg>
+                    </span>
+                    <div>
+                        <h3 class="feature-title">Unified Identity</h3>
+                        <p class="feature-copy">One identity across all your tools, teams, and workflows.</p>
+                    </div>
+                </article>
+            </div>
+        </div>
+
+        <aside class="testimonial" aria-label="Customer testimonial">
+            <p class="quote">"Prism cut our auth implementation time in half. It just works."</p>
+            <div class="person">
+                <span class="avatar" aria-hidden="true">SC</span>
+                <div>
+                    <p class="person-name">Sofia Chen</p>
+                    <p class="person-role">CTO at Velta Labs</p>
+                </div>
+            </div>
+        </aside>
+    </section>
+
+    <section class="form-panel" aria-labelledby="signin-title">
+        <div class="signin-card">
+            <header class="form-header">
+                <h1 id="signin-title">Welcome back</h1>
+                <p>Sign in to your Prism account</p>
+            </header>
+
+            <nav class="oauth-grid" aria-label="Social sign in options">
+                <a class="oauth-button" href="/oauth2/authorization/google">
+                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                        <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 01-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"></path>
+                        <path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 009 18z" fill="#34A853"></path>
+                        <path d="M3.964 10.71A5.41 5.41 0 013.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 000 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"></path>
+                        <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 00.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"></path>
+                    </svg>
+                    <span>Google</span>
+                </a>
+                <a class="oauth-button" href="/oauth2/authorization/github">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0112 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"></path>
+                    </svg>
+                    <span>GitHub</span>
+                </a>
+                <a class="oauth-button" href="#">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.213 5.567 5.95-5.567zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path>
+                    </svg>
+                    <span>X</span>
+                </a>
+                <a class="oauth-button" href="#">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#1877F2" aria-hidden="true">
+                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"></path>
+                    </svg>
+                    <span>Facebook</span>
+                </a>
+            </nav>
+
+            <div class="divider">or continue with email</div>
+
+            <form class="form" id="signin-form" action="/api/v1/auth/login" method="post">
+                <div class="field-group">
+                    <label for="email">Email address</label>
+                    <div class="input-wrap">
+                        <input id="email" name="email" type="email" autocomplete="email" placeholder="you@company.com" required>
+                    </div>
+                </div>
+
+                <div class="field-group">
+                    <div class="label-row">
+                        <label for="password">Password</label>
+                        <a class="link" href="/forgot-password">Forgot password?</a>
+                    </div>
+                    <div class="input-wrap">
+                        <input id="password" name="password" type="password" autocomplete="current-password" placeholder="••••••••••••" required>
+                        <button class="password-toggle" type="button" aria-label="Show password" aria-controls="password">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3.2" d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575a1 1 0 0 1 0 .696a10.8 10.8 0 0 1-1.444 2.49m-6.41-.679a3 3 0 0 1-4.242-4.242"></path>
+                                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3.2" d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151a1 1 0 0 1 0-.696a10.75 10.75 0 0 1 4.446-5.143M2 2l20 20"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <label class="remember-row">
+                    <input type="checkbox" name="rememberMe" checked>
+                    <span>Remember me for 30 days</span>
+                </label>
+
+                <button class="submit-button" type="submit">Sign in</button>
+                <p class="form-message" id="signin-message" role="status" aria-live="polite"></p>
+            </form>
+
+            <p class="signup-copy">Don't have an account? <a href="/signup">Create one free</a></p>
+        </div>
+    </section>
+</main>
+
+<script>
+    const password = document.getElementById("password");
+    const toggle = document.querySelector(".password-toggle");
+    const form = document.getElementById("signin-form");
+    const message = document.getElementById("signin-message");
+    const submitButton = form.querySelector(".submit-button");
+
+    toggle.addEventListener("click", () => {
+        const showingPassword = password.type === "text";
+        password.type = showingPassword ? "password" : "text";
+        toggle.setAttribute("aria-label", showingPassword ? "Show password" : "Hide password");
+    });
+
+    function showMessage(text, type) {
+        message.textContent = text;
+        message.className = `form-message is-visible is-${type}`;
+    }
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+
+        submitButton.disabled = true;
+        submitButton.textContent = "Signing in...";
+        message.className = "form-message";
+
+        try {
+            const response = await fetch(form.action, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                },
+                body: JSON.stringify({
+                    email: form.email.value,
+                    password: form.password.value
+                })
+            });
+
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok) {
+                throw new Error(payload.message || payload.errorDescription || "Invalid email or password.");
+            }
+
+            showMessage("Signed in successfully.", "success");
+
+            if (payload.accessToken || payload.token) {
+                localStorage.setItem("accessToken", payload.accessToken || payload.token);
+            }
+        } catch (error) {
+            showMessage(error.message, "error");
+        } finally {
+            submitButton.disabled = false;
+            submitButton.textContent = "Sign in";
+        }
+    });
+</script>
+</body>
+</html>

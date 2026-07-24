@@ -1,11 +1,12 @@
 package hud.SpringSecurityTemplate.config;
 
-import hud.SpringSecurityTemplate.security.CustomOAuth2AuthorizationSuccessHandler;
-import org.springframework.beans.factory.annotation.Autowired;
+import hud.SpringSecurityTemplate.security.oauth.CustomOAuth2AuthorizationSuccessHandler;
+import hud.SpringSecurityTemplate.security.oauth.CustomOAuth2UserService;
+import hud.SpringSecurityTemplate.security.oauth.CustomOidcUserService;
+import org.springframework.boot.security.autoconfigure.web.servlet.PathRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -15,9 +16,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.web.filter.CorsFilter;
 import hud.SpringSecurityTemplate.security.CustomUserDetailService;
 import hud.SpringSecurityTemplate.security.JwtRequestFilter;
 
@@ -25,35 +24,53 @@ import hud.SpringSecurityTemplate.security.JwtRequestFilter;
 @EnableWebSecurity
 public class AppSecurityConfig {
 
-    @Autowired
-    private CustomUserDetailService userDetailsService;
+    private final CustomUserDetailService userDetailsService;
+    private final JwtRequestFilter jwtRequestFilter;
+    private final CustomOAuth2UserService customOAuth2UserService;
+    private final CustomOidcUserService  customOidcUserService;
+    private final CustomOAuth2AuthorizationSuccessHandler customOAuth2AuthorizationSuccessHandler;
 
-    @Autowired
-    private JwtRequestFilter jwtRequestFilter;
-
-    @Autowired
-    private CustomOAuth2AuthorizationSuccessHandler customOAuth2AuthorizationSuccessHandler;
+    public AppSecurityConfig(CustomUserDetailService userDetailsService, JwtRequestFilter jwtRequestFilter, CustomOAuth2UserService customOAuth2UserService, CustomOidcUserService customOidcUserService, CustomOAuth2AuthorizationSuccessHandler customOAuth2AuthorizationSuccessHandler) {
+        this.userDetailsService = userDetailsService;
+        this.jwtRequestFilter = jwtRequestFilter;
+        this.customOAuth2UserService = customOAuth2UserService;
+        this.customOidcUserService = customOidcUserService;
+        this.customOAuth2AuthorizationSuccessHandler = customOAuth2AuthorizationSuccessHandler;
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    @Autowired
-    CorsFilter corsFilter;
-
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, AuthenticationEntryPoint authenticationEntryPoint) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, AuthenticationEntryPoint authenticationEntryPoint) {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(corsPolicy -> corsPolicy.configure(http))
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(PathRequest.toStaticResources().atCommonLocations()).permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()
-                        .requestMatchers("/login").permitAll()
+                        .requestMatchers(
+                                "/login/**",
+                                "/sign-in",
+                                "/signin",
+                                "/*.html",
+                                "/assets/**",
+                                "/fonts/**",
+                                "/icons/**",
+                                "/favicon.ico",
+                                "/manifest.json",
+                                "/robots.txt",
+                                "/error"
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
-
                 .oauth2Login(oauth2 -> oauth2
+                        .userInfoEndpoint(userInfo -> userInfo
+                                .userService(customOAuth2UserService)
+                                .oidcUserService(customOidcUserService)
+                        )
                         .successHandler(customOAuth2AuthorizationSuccessHandler)
                 )
                 .exceptionHandling(ex -> ex
@@ -67,7 +84,7 @@ public class AppSecurityConfig {
     }
 
     @Bean
-    public AuthenticationManager authManager(HttpSecurity http) throws Exception {
+    public AuthenticationManager authManager(HttpSecurity http) {
         AuthenticationManagerBuilder authenticationManagerBuilder =
                 http.getSharedObject(AuthenticationManagerBuilder.class);
         authenticationManagerBuilder.userDetailsService(userDetailsService).passwordEncoder(passwordEncoder());
