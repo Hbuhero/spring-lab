@@ -60,8 +60,8 @@ public class CustomOAuth2AuthorizationSuccessHandler implements AuthenticationSu
     private String extractEmail(OAuth2AuthenticationToken token) {
         Object principal = token.getPrincipal();
         if (principal instanceof OidcUser oidcUser) return oidcUser.getEmail();
-        if (principal instanceof OAuth2User oAuth2User) return (String) oAuth2User.getAttributes().get("email");
-        throw new IllegalStateException("Unsupported principal type: " + principal.getClass());
+        OAuth2User oAuth2User = (OAuth2User) principal;
+        return (String) oAuth2User.getAttributes().get("email");
     }
 
 }
