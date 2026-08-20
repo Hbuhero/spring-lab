@@ -1,50 +1,15 @@
+# docker-compose.yml (local test stack)
 services:
-  app:
-    build:
-      context: .
-    image: spring-security-email-verification:latest
+  lgtm:
+    image: grafana/otel-lgtm:latest
     ports:
-      - "8080:8080"
-    environment:
-      SERVER_PORT: 8080
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/email_verification
-      SPRING_DATASOURCE_USERNAME: email_verification
-      SPRING_DATASOURCE_PASSWORD: email_verification
-      APPLICATION_JWTSECRET: ${APPLICATION_JWTSECRET:-change-this-to-a-long-random-secret}
-      APPLICATION_FILEUPLOADPATH: /var/spring_security_template/uploads
-      APPLICATION_FILEDOWNLOADPATH: /var/spring_security_template/uploads
-      APP_URL: ${APP_URL:-http://localhost:8080}
-      APP_SUPPORT_EMAIL: ${APP_SUPPORT_EMAIL:-}
-      APP_OAUTH2_FRONTEND_REDIRECT_URI: ${APP_OAUTH2_FRONTEND_REDIRECT_URI:-http://localhost:3000/oauth/callback}
-      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-smtp.gmail.com}
-      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-465}
-      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
-      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
-      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
-      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
-      SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GITHUB_SCOPE: ${GITHUB_SCOPE:-}
-    volumes:
-      - uploads:/var/spring_security_template/uploads
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_DB: email_verification
-      POSTGRES_USER: email_verification
-      POSTGRES_PASSWORD: email_verification
+      - "3000:3000"   # Grafana UI
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+  prometheus:
+    image: prom/prometheus:latest
     ports:
-      - "5432:5432"
+      - "9090:9090"
+    command: ["--config.file=/etc/prometheus/prometheus.yml"]
     volumes:
-      - postgres-data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U email_verification -d email_verification"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-volumes:
-  postgres-data:
-  uploads:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml

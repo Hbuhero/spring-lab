@@ -30,7 +30,13 @@ public class AppSecurityConfig {
     private final CustomOidcUserService  customOidcUserService;
     private final CustomOAuth2AuthorizationSuccessHandler customOAuth2AuthorizationSuccessHandler;
 
-    public AppSecurityConfig(CustomUserDetailService userDetailsService, JwtRequestFilter jwtRequestFilter, CustomOAuth2UserService customOAuth2UserService, CustomOidcUserService customOidcUserService, CustomOAuth2AuthorizationSuccessHandler customOAuth2AuthorizationSuccessHandler) {
+    public AppSecurityConfig(
+            CustomUserDetailService userDetailsService,
+            JwtRequestFilter jwtRequestFilter,
+            CustomOAuth2UserService customOAuth2UserService,
+            CustomOidcUserService customOidcUserService,
+            CustomOAuth2AuthorizationSuccessHandler customOAuth2AuthorizationSuccessHandler
+    ) {
         this.userDetailsService = userDetailsService;
         this.jwtRequestFilter = jwtRequestFilter;
         this.customOAuth2UserService = customOAuth2UserService;
