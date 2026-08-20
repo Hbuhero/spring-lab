@@ -612,6 +612,65 @@ The repository therefore serves three purposes:
 
 ---
 
+## 🐳 Docker
+
+The project can be packaged as a Docker image with the included `Dockerfile`.
+
+### Build the image
+
+```bash
+docker build -t spring-security-email-verification:latest .
+```
+
+### Run with Docker Compose
+
+The simplest local runtime uses `docker-compose.yml`, which starts both the Spring Boot application and PostgreSQL.
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+The API will be available at:
+
+```text
+http://localhost:8080
+```
+
+### Run only the application image
+
+Use this when PostgreSQL is already running somewhere else.
+
+```bash
+docker run --rm \
+  --name spring-security-email-verification \
+  -p 8080:8080 \
+  -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/email_verification \
+  -e SPRING_DATASOURCE_USERNAME=postgres \
+  -e SPRING_DATASOURCE_PASSWORD=postgres \
+  -e APPLICATION_JWTSECRET=replace-with-a-long-random-secret \
+  spring-security-email-verification:latest
+```
+
+### Publish the image
+
+Tag and push the image to a registry so other people can pull it.
+
+```bash
+docker tag spring-security-email-verification:latest your-dockerhub-username/spring-security-email-verification:latest
+docker push your-dockerhub-username/spring-security-email-verification:latest
+```
+
+Then anyone can run it with:
+
+```bash
+docker run --rm -p 8080:8080 your-dockerhub-username/spring-security-email-verification:latest
+```
+
+For a useful runtime, they still need to provide database, JWT, email, and OAuth environment variables.
+
+---
+
 ## 📄 License
 
 This project is available under the [MIT License](LICENSE).

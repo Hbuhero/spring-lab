@@ -53,6 +53,7 @@ public class AppSecurityConfig {
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers(
                                 "/login/**",
+                                "/actuator/**",
                                 "/sign-in",
                                 "/signin",
                                 "/*.html",
