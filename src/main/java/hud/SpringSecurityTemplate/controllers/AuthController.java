@@ -130,6 +130,7 @@ public class AuthController {
 
         UserDetails userDetails = UserPrincipal.create(user);
         var authToken = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+
         JwtResponse jwt = jwtProvider.generateJwtToken(authToken);
 
         return authService.createLoginResponse(user, user.getRefreshToken(), jwt);
