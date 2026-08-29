@@ -9,9 +9,9 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>hud</groupId>
-    <artifactId>email-verification</artifactId>
+    <artifactId>spring-lab</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>email-verification</name>
+    <name>spring-lab</name>
     <description>Demo project for Spring Boot</description>
     <developers>
         <developer/>
